@@ -12,16 +12,43 @@ import { MapPin, Calendar, Car, DollarSign, Palette } from 'lucide-react'
 export default function TravelPlanning() {
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([])
   const [inputMessage, setInputMessage] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSendMessage = () => {
-    if (inputMessage.trim()) {
-      setChatMessages([...chatMessages, { role: 'user', content: inputMessage }])
-      // Here you would typically call an API to get the AI response
-      // For now, we'll just echo the user's message
-      setTimeout(() => {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: `You said: ${inputMessage}` }])
-      }, 1000)
+  const handleSendMessage = async () => {
+    if (inputMessage.trim() && !isLoading) {
+      const userMessage = inputMessage.trim()
       setInputMessage('')
+      setIsLoading(true)
+      
+      // 添加用户消息到聊天记录
+      setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
+      
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: userMessage }),
+        })
+        
+        if (!response.ok) {
+          throw new Error('网络请求失败')
+        }
+        
+        const data = await response.json()
+        
+        // 添加AI回复到聊天记录
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+      } catch (error) {
+        console.error('Error:', error)
+        setChatMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: '抱歉，发生了一些错误。请稍后再试。' 
+        }])
+      } finally {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -34,7 +61,9 @@ export default function TravelPlanning() {
         <div className="h-64 overflow-y-auto mb-4">
           {chatMessages.map((msg, index) => (
             <div key={index} className={`mb-2 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-              <span className={`inline-block p-2 rounded-lg ${msg.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+              <span className={`inline-block p-2 rounded-lg ${
+                msg.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'
+              }`}>
                 {msg.content}
               </span>
             </div>
@@ -46,8 +75,14 @@ export default function TravelPlanning() {
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder="输入您的旅游规划问题..."
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            disabled={isLoading}
           />
-          <Button onClick={handleSendMessage}>发送</Button>
+          <Button 
+            onClick={handleSendMessage} 
+            disabled={isLoading}
+          >
+            {isLoading ? '发送中...' : '发送'}
+          </Button>
         </div>
       </Card>
       
